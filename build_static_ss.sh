@@ -165,6 +165,11 @@ clean() {
 
 
 
+cur_dir="$(cd "$(dirname "$0")" && pwd)"
+
+echo "Current workspace is $cur_dir"
+
+: ${prefix=$cur_dir/build_library} ;
 
 while [ ! -z $1 ]; do
     case $1 in
@@ -173,7 +178,7 @@ while [ ! -z $1 ]; do
             echo ""
             echo "Options:"
             echo "     --host=<host>    the machine that you are building for"
-            echo "     --prefix=<path>  install architecture-independent files in prefix[$cur_dir/dists]"
+            echo "     --prefix=<path>  install architecture-independent files in $prefix"
             exit 0;;
         --host )
             shift
@@ -196,11 +201,6 @@ while [ ! -z $1 ]; do
 done
 
 
-cur_dir="$(cd "$(dirname "$0")" && pwd)"
-
-echo "Current workspace is $cur_dir"
-
-: ${prefix=$cur_dir/build_library} ;
 
 echo ""
 echo -e "binaries will be installed in ${green}${prefix}${plain}"
