@@ -184,7 +184,7 @@ while [ ! -z $1 ]; do
             shift
             host=$1;;
         --host=* )
-            arr=(${1//=/ })
+            arr=${1//=/ }
             host=${arr[1]};;
         --prefix)
             shift
@@ -192,7 +192,7 @@ while [ ! -z $1 ]; do
             echo "You set prefix: $prefix"
             ;;
         --prefix=*)
-            arr=(${1//=/ })
+            arr=${1//=/ }
             prefix=${arr[1]}
             echo "You set prefix: $prefix"
             ;;
