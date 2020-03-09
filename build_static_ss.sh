@@ -26,19 +26,9 @@ SHADOWSOCKS_LIBEV_FILE="https://github.com/shadowsocks/shadowsocks-libev"
 
 
 
-set_cc_for_build='
-trap "exitcode=\$?; (rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null) && exit \$exitcode" 0 ;
-trap "rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null; exit 1" 1 2 13 15 ;
-: ${TMPDIR=/tmp} ;
- { tmp=`(umask 077 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null` && test -n "$tmp" && test -d "$tmp" ; } ||
- { test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 077 && mkdir $tmp) ; } ||
- { tmp=$TMPDIR/cg-$$ && (umask 077 && mkdir $tmp) && echo "Warning: creating insecure temp directory" >&2 ; } ||
- { echo "$me: cannot create a temporary directory in $TMPDIR" >&2 ; exit 1 ; } ;
-dummy=$tmp/dummy ;
-tmpfiles="$dummy.c $dummy.o $dummy.rel $dummy" ;
-CC_FOR_BUILD=$compiler ; set_cc_for_build= ;'
 
 UNAME_SYSTEM=`(uname -s) 2>/dev/null`  || UNAME_SYSTEM=unknown
+
 res=false
 
 # as_fn_executable_p FILE
@@ -65,28 +55,39 @@ test_file(){
 
 prepare() {
 
+    set_cc_for_build='
+trap "exitcode=\$?; (rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null) && exit \$exitcode" 0 ;
+trap "rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null; exit 1" 1 2 13 15 ;
+: ${TMPDIR=/tmp} ;
+ { tmp=`(umask 077 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null` && test -n "$tmp" && test -d "$tmp" ; } ||
+ { test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 077 && mkdir $tmp) ; } ||
+ { tmp=$TMPDIR/cg-$$ && (umask 077 && mkdir $tmp) && echo "Warning: creating insecure temp directory" >&2 ; } ||
+ { echo "$me: cannot create a temporary directory in $TMPDIR" >&2 ; exit 1 ; } ;
+dummy=$tmp/dummy ;
+tmpfiles="$dummy.c $dummy.o $dummy.rel $dummy" ;
+CC_FOR_BUILD=$compiler ; set_cc_for_build= ;'
+
 #
 # Detect the libc used by compiler
 #
-case "$UNAME_SYSTEM" in
-Linux|GNU|GNU/*)
-	# If the system lacks a compiler, then just pick glibc.
-	# We could probably try harder.
-	LIBC=gnu
+    case "$UNAME_SYSTEM" in
+        Linux|GNU|GNU/*)
+	    # If the system lacks a compiler, then just pick glibc.
+	    # We could probably try harder.
+	    LIBC=gnu
 
-	eval "$set_cc_for_build"
-	cat <<-EOF > "$dummy.c"
-	#include <features.h>
-	#if defined(__UCLIBC__)
-	LIBC=uclibc
-	#elif defined(__dietlibc__)
-	LIBC=dietlibc
-	#else
-	LIBC=gnu
-	#endif
-	EOF
+	    eval "$set_cc_for_build"
+cat <<-EOF > "$dummy.c"
+#include <features.h>
+#if defined(__UCLIBC__)
+LIBC=uclibc
+#elif defined(__dietlibc__)
+LIBC=dietlibc
+#else
+LIBC=gnu
+#endif
+EOF
 	eval "`$CC_FOR_BUILD -E "$dummy.c" 2>/dev/null | grep '^LIBC' | sed 's, ,,g'`"
-
     {
         res=$($CC_FOR_BUILD -v 2>&1 | grep COLLECT_GCC | grep musl)
         [[ -n $res ]] && LIBC=musl
@@ -98,12 +99,14 @@ Linux|GNU|GNU/*)
         exit 1;
     fi
 	;;
-esac
-
+    esac
 
 
     rm -rf $cur_dir/build_src && mkdir $cur_dir/build_src
+    [[ $? != 0 ]] && exit 1;
+
     rm -rf $prefix && mkdir $prefix
+    [[ $? != 0 ]] && exit 1;
 }
 
 
@@ -185,9 +188,36 @@ clean() {
 }
 
 
+check_targethost(){
+
+    targethost_err_msg="Suppert auto download toolchains for host: \n
+    ${green}\n
+    - aarch64-linux-musl \n
+    - aarch64-buildroot-linux-uclibc \n
+    - arm-linux-musleabi \n
+    ${plain}
+    \n
+
+    But your host is $host
+    "
+
+    {
+        [[ $host = "aarch64-linux-musl"  ]] ||
+        [[ $host = "aarch64-buildroot-linux-uclibc"  ]] ||
+        [[ $host = "arm-linux-musleabi" ]]
+
+    } && echo -e "${green}Target host is $host${plain}" || {
+        echo -e "${red}Unknow target host${plain}"
+        echo -e $targethost_err_msg
+        exit 1
+    }
+}
+
+
 
 
 main(){
+
 
     cur_dir="$(cd "$(dirname "$0")" && pwd)"
     requir_bin="sed cut find make git"
@@ -236,6 +266,30 @@ while [ ! -z $1 ]; do
             prefix=$arr
             echo "You set prefix: $prefix"
             ;;
+        -dt|--download-toolchains)
+        {{{
+            test_file $compiler
+            if [[ $res = "true"  ]];then
+                echo "Found $compiler"
+            else
+                echo Auto download toolchains for $host
+                check_targethost
+                $proxychains wget https://github.com/ihexon/aarch64-musl-gcc/releases/download/aarch64-musl-gcc/$host-cross.tar.xz
+                if [[ $? = 0 ]];then
+                      echo "Download completed"
+                      mkdir -p tools
+                      mv $host-cross.tar.xz tools/
+                      tar -xvf tools/$host-cross.tar.xz -C tools/
+                      ##
+                      ## TODO: Autodownload toolchains and install
+                      ##
+                else
+                      echo -e "${red}Download Toolchains failed${plain}"
+                      exit 1;
+                fi
+            fi
+        }}}
+            ;;
     esac
     shift
 done
@@ -252,7 +306,10 @@ echo ""
     if [[ $res = "true"  ]];then
         echo "Found $compiler"
     else
-        echo -e "${red}Error:${plain} not found cross compiler ${green}${compiler}${plain}"
+        echo ""
+        echo -e "${red}Error:${plain} not found cross compiler ${red}${compiler}${plain}"
+        echo -e "You need to install install cross toolchains, or try -dt to autodownload toolchains into $cur_dir/tools/"
+        echo ""
         exit 1;
     fi
 }
