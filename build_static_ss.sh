@@ -115,6 +115,7 @@ compile_pcre() {
     [ -d $prefix/pcre ] && return
     cd $cur_dir/build_src
     $proxychains wget --no-check-certificate $PCRE_FILE
+    test $? != 0 && exit 1;
     tar xvf pcre-$PCRE_VER.tar.gz
     cd pcre-$PCRE_VER
     CPPFLAGS="-DNEED_PRINTF" ./configure --prefix=$prefix/pcre --host=$host --enable-jit --enable-utf8 --enable-unicode-properties --disable-shared
@@ -127,6 +128,7 @@ compile_mbedtls() {
 
     cd $cur_dir/build_src
     $proxychains wget --no-check-certificate $MBEDTLS_FILE
+    test $? != 0 && exit 1;
     tar xvf mbedtls-$MBEDTLS_VER-gpl.tgz
     cd mbedtls-$MBEDTLS_VER
     prefix_reg=$(echo $prefix | sed "s/\//\\\\\//g")
@@ -140,6 +142,7 @@ compile_libsodium() {
 
     cd $cur_dir/build_src
     $proxychains wget --no-check-certificate $LIBSODIUM_FILE
+    test $? != 0 && exit 1;
     tar xvf libsodium-$LIBSODIUM_VER.tar.gz
     cd libsodium-$LIBSODIUM_VER
     ./configure --prefix=$prefix/libsodium --host=$host --disable-ssp --disable-shared
@@ -152,6 +155,7 @@ compile_libev() {
 
     cd $cur_dir/build_src
     $proxychains wget --no-check-certificate $LIBEV_FILE
+    test $? != 0 && exit 1;
     tar xvf libev-$LIBEV_VER.tar.gz
     cd libev-$LIBEV_VER
     ./configure --prefix=$prefix/libev --host=$host --disable-shared
@@ -163,6 +167,7 @@ compile_libc_ares() {
 
     cd $cur_dir/build_src
     proxychains wget --no-check-certificate $LIBC_ARES_FILE
+    test $? != 0 && exit 1;
     tar xvf c-ares-$LIBC_ARES_VER.tar.gz
     cd c-ares-$LIBC_ARES_VER
     ./configure --prefix=$prefix/libc-ares --host=$host --disable-shared
@@ -175,8 +180,10 @@ compile_shadowsocks_libev() {
 
     cd $cur_dir/build_src
     $proxychains git clone --branch v$SHADOWSOCKS_LIBEV_VER --single-branch --depth 1 $SHADOWSOCKS_LIBEV_FILE
+    test $? != 0 && exit 1;
     cd shadowsocks-libev
     $proxychains git submodule update --init --recursive
+    test $? != 0 && exit 1;
     ./autogen.sh
     LDFLAGS="--static -L$prefix/libc-ares/lib -L$prefix/libev/lib" CFLAGS="-I$prefix/libc-ares/include -I$prefix/libev/include" ./configure --prefix=$prefix/shadowsocks-libev --host=$host --disable-ssp --disable-documentation --with-mbedtls=$prefix/mbedtls --with-pcre=$prefix/pcre --with-sodium=$prefix/libsodium
     CC=$host-gcc AR=$host-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-ar LD=$host-ld make install
