@@ -166,7 +166,7 @@ compile_libc_ares() {
     [ -d $prefix/libc-ares ] && return
 
     cd $cur_dir/build_src
-    proxychains wget --no-check-certificate $LIBC_ARES_FILE
+    $proxychains wget --no-check-certificate $LIBC_ARES_FILE
     test $? != 0 && exit 1;
     tar xvf c-ares-$LIBC_ARES_VER.tar.gz
     cd c-ares-$LIBC_ARES_VER
