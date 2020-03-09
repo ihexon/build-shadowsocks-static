@@ -133,7 +133,7 @@ compile_mbedtls() {
     cd mbedtls-$MBEDTLS_VER
     prefix_reg=$(echo $prefix | sed "s/\//\\\\\//g")
     sed -i "s/DESTDIR=\/usr\/local/DESTDIR=$prefix_reg\/mbedtls/g" Makefile
-    CC=$host-gcc AR=$host-ar LD=$host-ld make install -j2
+    CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make install -j2
 }
 
 
@@ -146,7 +146,7 @@ compile_libsodium() {
     tar xvf libsodium-$LIBSODIUM_VER.tar.gz
     cd libsodium-$LIBSODIUM_VER
     ./configure --prefix=$prefix/libsodium --host=$host --disable-ssp --disable-shared
-    CC=$host-gcc AR=$host-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-ar LD=$host-ld make install
+    CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make install
 }
 
 
@@ -159,7 +159,7 @@ compile_libev() {
     tar xvf libev-$LIBEV_VER.tar.gz
     cd libev-$LIBEV_VER
     ./configure --prefix=$prefix/libev --host=$host --disable-shared
-    CC=$host-gcc AR=$host-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-ar LD=$host-ld make install
+    CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make install
 }
 
 compile_libc_ares() {
@@ -171,7 +171,7 @@ compile_libc_ares() {
     tar xvf c-ares-$LIBC_ARES_VER.tar.gz
     cd c-ares-$LIBC_ARES_VER
     ./configure --prefix=$prefix/libc-ares --host=$host --disable-shared
-    CC=$host-gcc AR=$host-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-ar LD=$host-ld make install
+    CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make install
 }
 
 
@@ -186,7 +186,9 @@ compile_shadowsocks_libev() {
     test $? != 0 && exit 1;
     ./autogen.sh
     LDFLAGS="--static -L$prefix/libc-ares/lib -L$prefix/libev/lib" CFLAGS="-I$prefix/libc-ares/include -I$prefix/libev/include" ./configure --prefix=$prefix/shadowsocks-libev --host=$host --disable-ssp --disable-documentation --with-mbedtls=$prefix/mbedtls --with-pcre=$prefix/pcre --with-sodium=$prefix/libsodium
-    CC=$host-gcc AR=$host-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-ar LD=$host-ld make install
+    test $? != 0 && exit 1;
+    CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-gcc-ar LD=$host-ld make install
+    test $? != 0 && exit 1;
 }
 
 clean() {
