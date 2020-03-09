@@ -49,7 +49,6 @@ as_fn_executable_p ()
   test -f "$1" && test -x "$1"
 }
 as_test_x='test -x'
-as_executable_p=as_fn_executable_p
 
 test_file(){
     PATH_SEPARATOR=:
@@ -66,6 +65,9 @@ test_file(){
 
 prepare() {
 
+#
+# Detect the libc used by compiler
+#
 case "$UNAME_SYSTEM" in
 Linux|GNU|GNU/*)
 	# If the system lacks a compiler, then just pick glibc.
@@ -216,7 +218,15 @@ while [ ! -z $1 ]; do
             host=$1;;
         --host=* )
             arr=$(echo $1 | cut -f2 -d '=')
-            host=$arr;;
+            host=$arr
+
+            if [[ -n $host ]];then
+                compiler=$host-gcc
+            else
+                echo -e "${red}You must special the host which you are build for${plain}"
+            exit 1;
+            fi
+            ;;
         --prefix)
             shift
             prefix=$1
@@ -236,14 +246,16 @@ echo ""
 echo -e "binaries will be installed in ${green}${prefix}${plain}"
 echo ""
 
-if [[ -n $host ]];then
-    compiler=$host-gcc
-else
-    echo -e "${red}You must special the host which you are build for${plain}"
-    exit 1;
-fi
-
-test_file $compiler && echo "Found $compiler" || echo -e "${red}Error:${plain} not found cross compiler ${green}${compiler}${plain}"
+# Found cross_compiler
+{
+    test_file $compiler
+    if [[ $res = "true"  ]];then
+        echo "Found $compiler"
+    else
+        echo -e "${red}Error:${plain} not found cross compiler ${green}${compiler}${plain}"
+        exit 1;
+    fi
+}
 
 prepare
 compile_pcre
