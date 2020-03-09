@@ -3,6 +3,29 @@ red="\033[0;31m"
 green="\033[0;32m"
 plain="\033[0m"
 
+PCRE_VER="8.44"
+PCRE_FILE="https://ftp.pcre.org/pub/pcre/pcre-$PCRE_VER.tar.gz"
+
+MBEDTLS_VER=2.16.5
+MBEDTLS_FILE="https://tls.mbed.org/download/mbedtls-$MBEDTLS_VER-gpl.tgz"
+
+
+LIBSODIUM_VER=1.0.18
+LIBSODIUM_FILE="https://download.libsodium.org/libsodium/releases/libsodium-$LIBSODIUM_VER.tar.gz"
+
+
+LIBEV_VER=4.31
+LIBEV_FILE="http://dist.schmorp.de/libev/libev-$LIBEV_VER.tar.gz"
+
+LIBC_ARES_VER=1.14.0
+LIBC_ARES_FILE="https://c-ares.haxx.se/download/c-ares-$LIBC_ARES_VER.tar.gz"
+
+
+SHADOWSOCKS_LIBEV_VER=3.3.4
+SHADOWSOCKS_LIBEV_FILE="https://github.com/shadowsocks/shadowsocks-libev"
+
+
+
 set_cc_for_build='
 trap "exitcode=\$?; (rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null) && exit \$exitcode" 0 ;
 trap "rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null; exit 1" 1 2 13 15 ;
@@ -15,11 +38,31 @@ dummy=$tmp/dummy ;
 tmpfiles="$dummy.c $dummy.o $dummy.rel $dummy" ;
 CC_FOR_BUILD=$compiler ; set_cc_for_build= ;'
 
-UNAME_MACHINE=`(uname -m) 2>/dev/null` || UNAME_MACHINE=unknown
-UNAME_RELEASE=`(uname -r) 2>/dev/null` || UNAME_RELEASE=unknown
 UNAME_SYSTEM=`(uname -s) 2>/dev/null`  || UNAME_SYSTEM=unknown
-UNAME_VERSION=`(uname -v) 2>/dev/null` || UNAME_VERSION=unknown
+res=false
 
+# as_fn_executable_p FILE
+# -----------------------
+# Test if FILE is an executable regular file.
+as_fn_executable_p ()
+{
+  test -f "$1" && test -x "$1"
+}
+as_test_x='test -x'
+as_executable_p=as_fn_executable_p
+
+test_file(){
+    PATH_SEPARATOR=:
+    local IFS=$PATH_SEPARATOR
+    for path in $PATH;do
+        if as_fn_executable_p $path/$1;then
+            res=true;
+            break
+        else
+            res=false
+        fi
+    done
+}
 
 prepare() {
 
@@ -55,38 +98,16 @@ Linux|GNU|GNU/*)
 	;;
 esac
 
-    if [[  -n $(which wget)  ]] && [[ -n $(which make) ]];then
-        echo "Found wget and make, continue...."
-    else
-        echo -e "${red}Cannot find wget or make , please install make and wget ,and add it into path env"
-        exit 1;
-    fi
+
 
     rm -rf $cur_dir/build_src && mkdir $cur_dir/build_src
     rm -rf $prefix && mkdir $prefix
 }
 
 
-PCRE_VER="8.44"
-PCRE_FILE="https://ftp.pcre.org/pub/pcre/pcre-$PCRE_VER.tar.gz"
-
-MBEDTLS_VER=2.16.5
-MBEDTLS_FILE="https://tls.mbed.org/download/mbedtls-$MBEDTLS_VER-gpl.tgz"
-
-
-LIBSODIUM_VER=1.0.18
-LIBSODIUM_FILE="https://download.libsodium.org/libsodium/releases/libsodium-$LIBSODIUM_VER.tar.gz"
-
-
-LIBEV_VER=4.31
-LIBEV_FILE="http://dist.schmorp.de/libev/libev-$LIBEV_VER.tar.gz"
-
-LIBC_ARES_VER=1.14.0
-LIBC_ARES_FILE="https://c-ares.haxx.se/download/c-ares-$LIBC_ARES_VER.tar.gz"
 
 compile_pcre() {
     [ -d $prefix/pcre ] && return
-
     cd $cur_dir/build_src
     $proxychains wget --no-check-certificate $PCRE_FILE
     tar xvf pcre-$PCRE_VER.tar.gz
@@ -143,8 +164,6 @@ compile_libc_ares() {
     CC=$host-gcc AR=$host-ar LD=$host-ld make -j2 && CC=$host-gcc AR=$host-ar LD=$host-ld make install
 }
 
-SHADOWSOCKS_LIBEV_VER=3.3.4
-SHADOWSOCKS_LIBEV_FILE="https://github.com/shadowsocks/shadowsocks-libev"
 
 compile_shadowsocks_libev() {
     [ -f $prefix/shadowsocks-libev/bin/ss-local ] && return
@@ -165,9 +184,21 @@ clean() {
 
 
 
-cur_dir="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Current workspace is $cur_dir"
+main(){
+
+    cur_dir="$(cd "$(dirname "$0")" && pwd)"
+    requir_bin="sed cut find make git"
+
+    for prog in $requir_bin;do
+        test_file $prog
+    if [ $res = "true"  ];then
+        echo "Found $prog";
+    else
+        echo Cannot found $prog && exit 1;
+    fi
+
+done
 
 : ${prefix=$cur_dir/build_library} ;
 
@@ -184,16 +215,15 @@ while [ ! -z $1 ]; do
             shift
             host=$1;;
         --host=* )
-            arr=${1//=/ }
-            host=${arr[1]};;
+            arr=$(echo $1 | cut -f2 -d '=')
+            host=$arr;;
         --prefix)
             shift
             prefix=$1
-            echo "You set prefix: $prefix"
-            ;;
+            echo "You set prefix: $prefix";;
         --prefix=*)
-            arr=${1//=/ }
-            prefix=${arr[1]}
+            arr=$(echo $1 | cut -f2 -d '=')
+            prefix=$arr
             echo "You set prefix: $prefix"
             ;;
     esac
@@ -213,12 +243,7 @@ else
     exit 1;
 fi
 
-if [[ -f "$(which $compiler)" ]]; then
-    echo -e "found cross compiler ${green}$(which ${compiler})${plain}"
-else
-    echo -e "${red}Error:${plain} not found cross compiler ${green}${compiler}${plain}"
-    exit -1
-fi
+test_file $compiler && echo "Found $compiler" || echo -e "${red}Error:${plain} not found cross compiler ${green}${compiler}${plain}"
 
 prepare
 compile_pcre
@@ -228,3 +253,6 @@ compile_libev
 compile_libc_ares
 compile_shadowsocks_libev
 clean
+}
+
+main $@
